@@ -1,48 +1,25 @@
-name: Build & Release Upload
+name: Build & Upload Release
 on:
   push:
-    tags:
-      - 'v*' # 推送v开头版本标签才触发发布，如git tag v1.0.0 && git push origin v1.0.0
-  workflow_dispatch: # 支持手动点按钮运行
-
+    tags: ['v*']
+  workflow_dispatch:
 jobs:
-  build_release:
+  build:
     runs-on: ubuntu-latest
     steps:
-      # 1.拉代码
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # 2.配置Node
+      - uses: actions/checkout@v4
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20.2.2
-          cache: false
-
-      # 3.全局装pnpm（方案3）
-      - name: Install pnpm
-        run: npm install -g pnpm
-
-      # 4.安装依赖+打包
-      - name: Install & Build
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm build
-
-      # 5.把dist压缩成zip包（关键，打包产物）
-      - name: Compress dist to zip
-        run: |
-          zip -r dist-${{ github.ref_name }}.zip ./dist
-        # 最终生成文件：dist-v1.0.0.zip
-
-      # 6.自动创建Release并上传压缩包到Releases
-      - name: Create Release & Upload Zip
-        uses: softprops/action-gh-release@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # 内置token无需手动配置密钥
+      - run: npm install -g pnpm
+      - run: pnpm install && pnpm build
+      # 压缩打包产物
+      - name: Zip build file
+        run: zip -r Moontv-${{ github.ref_name }}.zip ./dist
+      # 上传到Release
+      - uses: softprops/action-gh-release@v2
         with:
-          files: dist-${{ github.ref_name }}.zip
-          generate_release_notes: true # 自动生成更新日志
-          draft: false # false直接发布；true存草稿手动发布
-          prerelease: false # 是否预发布版本
+          files: Moontv-${{ github.ref_name }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
