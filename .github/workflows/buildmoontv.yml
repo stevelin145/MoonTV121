@@ -1,33 +1,54 @@
-name: Build & Upload Release
+name: MoonTV Auto Release
+# 只监听main分支提交
 on:
   push:
-    tags: ['v*']
-  workflow_dispatch:
+    branches: [ main ]
+  workflow_dispatch: # 支持手动点Run workflow触发
+
 jobs:
-  build:
+  build_release:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # 必须权限：自动创建tag+Release
     steps:
-      - uses: actions/checkout@v4
-      - name: Setup Node.js
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20
         uses: actions/setup-node@v4
         with:
           node-version: 20
+
       - name: Install pnpm
         run: npm install -g pnpm
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Next打包（生成standalone部署包）
+
+      - name: Next.js Build
         run: pnpm build
-      # 查看打包生成目录，确认产物
-      - name: List dir
-        run: ls -la .next
-      # Next独立部署包在 .next/standalone，打包这个
-      - name: Zip Release包
-        run: zip -r MoonTV-${{ github.ref_name }}.zip .next/standalone config.json
-      # 上传到Release
-      - uses: softprops/action-gh-release@v2
+
+      # Next补全部署所需静态资源（关键：standalone默认不带public和static）
+      - name: Copy public & static into standalone
+        run: |
+          cp -r public .next/standalone/
+          cp -r .next/static .next/standalone/.next/
+
+      # 打包全量部署压缩包
+      - name: Zip deploy package
+        run: |
+          ZIP_NAME=MoonTV-build-${{ github.sha }}.zip
+          zip -r $ZIP_NAME .next/standalone config.json README.md
+          echo "ZIP_FILE=$ZIP_NAME" >> $GITHUB_ENV
+
+      # 自动生成tag+创建Release，commit哈希做版本号，每次main提交自动发版
+      - name: Create Github Release
+        uses: softprops/action-gh-release@v2
         with:
-          files: MoonTV-${{ github.ref_name }}.zip
-          generate_release_notes: true
+          tag_name: build-${{ github.sha }} # 自动生成唯一tag，解决无tag报错
+          release_name: MoonTV AutoBuild ${{ github.sha }}
+          files: ${{ env.ZIP_FILE }}
+          generate_release_notes: true # 自动生成提交日志
+          prerelease: true # 标记为预发布，不占用正式版本号
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
