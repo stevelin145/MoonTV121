@@ -11,20 +11,23 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20 # 修复：去掉错误的20.2.2
+          node-version: 20
       - name: Install pnpm
         run: npm install -g pnpm
-      - name: Install & Build
-        run: |
-          pnpm install --frozen-lockfile
-          pnpm build
-      # 压缩产物
-      - name: Zip output file
-        run: zip -r Moontv-${{ github.ref_name }}.zip ./dist
-      # 上传到Releases
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Next打包（生成standalone部署包）
+        run: pnpm build
+      # 查看打包生成目录，确认产物
+      - name: List dir
+        run: ls -la .next
+      # Next独立部署包在 .next/standalone，打包这个
+      - name: Zip Release包
+        run: zip -r MoonTV-${{ github.ref_name }}.zip .next/standalone config.json
+      # 上传到Release
       - uses: softprops/action-gh-release@v2
         with:
-          files: Moontv-${{ github.ref_name }}.zip
+          files: MoonTV-${{ github.ref_name }}.zip
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
